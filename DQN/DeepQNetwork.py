@@ -1,7 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras import layers
 
-
 class PredictDeepQNet(tf.keras.Model):
     def __init__(self, input_dim, output_dim):
         super(PredictDeepQNet, self).__init__()
