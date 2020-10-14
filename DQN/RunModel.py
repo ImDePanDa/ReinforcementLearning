@@ -60,5 +60,3 @@ if __name__ == "__main__":
     INPUT_DIM, OUTPUT_DIM = 2, 4
     model = Model()
     model.run()
-
-
