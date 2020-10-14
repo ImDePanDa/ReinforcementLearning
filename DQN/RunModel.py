@@ -17,7 +17,6 @@ class CustomCallback(tf.keras.callbacks.Callback):
 class Model(object):
     def __init__(self):
         self.init_model()
-        self.lambda_func = lambda i: np.array(list(map(lambda x: x[i], self.experience_replay)))
 
     def init_model(self):
         self.predict_model = PredictDeepQNet(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM)
@@ -31,21 +30,21 @@ class Model(object):
         return tf.keras.losses.MSE(y_actual, y_pred)
 
     def train(self):
-        init_states_np, next_states_np, actions = self.lambda_func(0), self.lambda_func(3), self.lambda_func(1)
+        init_states_np, next_states_np, actions = self.experience_replay[:, :2], self.experience_replay[:, -2:], self.experience_replay[:, 2]
         early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-5,
                                     patience=0, verbose=0, mode='auto',
                                     baseline=None, restore_best_weights=False)
         custom_callback = CustomCallback(self.predict_model, self.target_model)
         labels_data = self.get_labels(init_states_np, next_states_np, actions)
-        self.predict_model.fit(init_states_np, labels_data, batch_size=4, shuffle=True, verbose=0, epochs=1, validation_split=0, callbacks=[])
+        self.predict_model.fit(init_states_np, labels_data, batch_size=16, shuffle=True, verbose=0, epochs=1, validation_split=0, callbacks=[])
         
     def get_labels(self, init_states_np, next_states_np, actions):
         gama = 0.9
-        target_data = self.lambda_func(2).reshape(-1, 1) + gama * self.target_model.predict(next_states_np, verbose=0)
+        target_data = self.experience_replay[:, 3].reshape(-1, 1) + gama * self.target_model.predict(next_states_np, verbose=0)
         target_data_max = np.max(target_data, axis=1)
         predict_data = self.predict_model.predict(init_states_np, verbose=0)
         for i, action in enumerate(actions):
-            predict_data[i][action] = target_data_max[i]
+            predict_data[i][int(action)] = target_data_max[i]
         return predict_data
 
     def run(self):
@@ -60,9 +59,10 @@ class Model(object):
                 test_model(self.target_model)
 
             memory_replay.explore_env(100, self.target_model)
-            self.experience_replay = memory_replay.sample(1000)
+            self.experience_replay = memory_replay.sample(1000, self.experience_replay)
             for i in self.experience_replay:
                 print(i)
+            print(self.experience_replay.shape)
 
 if __name__ == "__main__":
     INPUT_DIM, OUTPUT_DIM = 2, 4

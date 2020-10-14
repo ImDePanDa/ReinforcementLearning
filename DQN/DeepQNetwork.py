@@ -15,8 +15,8 @@ class PredictDeepQNet(tf.keras.Model):
 class TargetDeepQNet(tf.keras.Model):
     def __init__(self, input_dim, output_dim):
         super(TargetDeepQNet, self).__init__()
-        self.dense1 = layers.Dense(4, activation=tf.nn.tanh, input_dim=input_dim)
-        self.dense2 = layers.Dense(output_dim, activation=tf.nn.tanh)
+        self.dense1 = layers.Dense(4, activation=tf.nn.tanh, input_dim=input_dim, kernel_initializer=tf.zeros_initializer(), bias_initializer=tf.zeros_initializer())
+        self.dense2 = layers.Dense(output_dim, activation=tf.nn.tanh, kernel_initializer=tf.zeros_initializer(), bias_initializer=tf.zeros_initializer())
 
     def call(self, inputs):
         x = self.dense1(inputs)

@@ -4,8 +4,8 @@ import time
 import gym
 import gym_maze
 import numpy as np
+import pandas as pd
 
-# import tensorflow as tf
 
 class MemoryReplay(object):
     def __init__(self, replay_size=1000, e_greed=0.6, e_greed_decay=0.9):
@@ -45,15 +45,16 @@ class MemoryReplay(object):
             observation = np.copy(next_observation)
         self.e_greed *= self.e_greed_decay
         
-    def sample(self, num):
-        random.shuffle(self.memory_replay)
-        ret, count = [], 0
-        for ob_tuple in self.memory_replay:
-            if ob_tuple[2] == 1:
-                count += 1
-                if count * 3 > num: continue
-                else: ret.append(ob_tuple)
-        return ret + self.memory_replay[:(num-count)]
+    def sample(self, num, input_np=False):
+        help_func = lambda i: np.array(list(map(lambda x: x[i], self.memory_replay)))
+        init_np = help_func(0)
+        for i in range(1, 4):
+            next_np = help_func(i).reshape(-1, 1) if len(help_func(i).shape) == 1 else help_func(i)
+            init_np = np.append(init_np, next_np, axis=1)
+        init_np = np.append(init_np, input_np, axis=0) if not isinstance(input_np, bool) else init_np
+        init_np = np.unique(init_np, axis=0)
+        df = pd.DataFrame(init_np)
+        return df.sample(num, replace=True).values
 
     def get_memory_replay(self):
         return self.memory_replay
@@ -64,16 +65,16 @@ class MemoryReplay(object):
     def get_actions_num(self):
         return self.actions_num
 
-def test_model(model):
+def test_model(model, pro=0.7):
     # model = tf.keras.models.load_model("./RL_MODEL")
     env = gym.make('maze-sample-5x5-v0')
     observation = env.reset()
-    for i in range(10):
+    for i in range(20):
         env.render()
-        time.sleep(0.5)
+        time.sleep(0.1)
         # print(model.predict(observation.reshape(-1, 2)))
         # action = ['N', 'E', 'S', 'W'][model.predict(observation.reshape(-1, 2)).argmax()] if input() == "m" else input()
-        action = int(model.predict(observation.reshape(-1, 2)).argmax())
+        action = int(model.predict(observation.reshape(-1, 2)).argmax()) if np.random.random()<pro else env.action_space.sample()
         print(["N", "S", "E", "W"][action])
         next_observation, reward, done, info = env.step(action)
         observation = np.copy(next_observation)
@@ -87,6 +88,4 @@ if __name__ == "__main__":
         print(i)
     print("("*30)
     a.explore_env(100)
-    memory_replay = a.get_memory_replay()
-    for i in memory_replay:
-        print(i)
+    a.sample(1000)
