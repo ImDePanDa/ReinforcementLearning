@@ -1,5 +1,5 @@
 from DeepQNetwork import PredictDeepQNet, TargetDeepQNet
-from Utils import create_experience_replay, test_model
+from Utils import MemoryReplay, test_model
 import numpy as np 
 import tensorflow as tf
 
@@ -17,13 +17,12 @@ class CustomCallback(tf.keras.callbacks.Callback):
 class Model(object):
     def __init__(self):
         self.init_model()
-        self.experience_replay = []
         self.lambda_func = lambda i: np.array(list(map(lambda x: x[i], self.experience_replay)))
 
     def init_model(self):
         self.predict_model = PredictDeepQNet(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM)
         self.target_model = TargetDeepQNet(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM)
-        self.predict_model.compile(optimizer="Adam", loss=self.custom_loss, metrics=["mse"])
+        self.predict_model.compile(optimizer="Adam", loss="MSE", metrics=["mse"])
 
     def custom_loss(self, y_actual, y_pred):
         max_num = tf.reduce_max(y_actual, axis=1, keepdims=True)
@@ -31,30 +30,39 @@ class Model(object):
         y_actual = tf.where(mask, y_actual, y_pred)
         return tf.keras.losses.MSE(y_actual, y_pred)
 
-    def train(self, init_states_np, next_states_np):
+    def train(self):
+        init_states_np, next_states_np, actions = self.lambda_func(0), self.lambda_func(3), self.lambda_func(1)
         early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-5,
                                     patience=0, verbose=0, mode='auto',
                                     baseline=None, restore_best_weights=False)
         custom_callback = CustomCallback(self.predict_model, self.target_model)
-        # print(init_states_np)
-        # print(next_states_np)
-        target_data = self.get_labels(next_states_np)
-        # print(target_data)
-        self.predict_model.fit(init_states_np, target_data, batch_size=4, shuffle=True, verbose=0, epochs=10, validation_split=0, callbacks = [custom_callback])
+        labels_data = self.get_labels(init_states_np, next_states_np, actions)
+        self.predict_model.fit(init_states_np, labels_data, batch_size=4, shuffle=True, verbose=0, epochs=1, validation_split=0, callbacks=[])
         
-    def get_labels(self, predict_data):
+    def get_labels(self, init_states_np, next_states_np, actions):
         gama = 0.9
-        return self.lambda_func(2).reshape(-1, 1) + gama * self.target_model.predict(predict_data, verbose=0)
+        target_data = self.lambda_func(2).reshape(-1, 1) + gama * self.target_model.predict(next_states_np, verbose=0)
+        target_data_max = np.max(target_data, axis=1)
+        predict_data = self.predict_model.predict(init_states_np, verbose=0)
+        for i, action in enumerate(actions):
+            predict_data[i][action] = target_data_max[i]
+        return predict_data
 
     def run(self):
-        creater_iteration = create_experience_replay(1000*100)
+        memory_replay = MemoryReplay(3000, e_greed=0.6, e_greed_decay=0.9)
+        self.experience_replay = memory_replay.sample(1000)
+
         for i in range(100):
             print("EPOCHES: {}".format(i))
-            for index, observation_tuple in enumerate(creater_iteration):
-                self.experience_replay.append(observation_tuple)
-                if len(self.experience_replay) >= 1000: break
-            self.train(self.lambda_func(0), self.lambda_func(3))
-            self.experience_replay = self.experience_replay[100:]
+            self.train()
+            if (i+1) % 4 == 0:
+                self.target_model.set_weights(self.predict_model.get_weights())
+                test_model(self.target_model)
+
+            memory_replay.explore_env(100, self.target_model)
+            self.experience_replay = memory_replay.sample(1000)
+            for i in self.experience_replay:
+                print(i)
 
 if __name__ == "__main__":
     INPUT_DIM, OUTPUT_DIM = 2, 4
