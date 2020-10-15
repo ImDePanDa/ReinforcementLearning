@@ -1,70 +1,77 @@
-from DeepQNetwork import PredictDeepQNet, TargetDeepQNet
-from Utils import MemoryReplay, test_model
-import numpy as np 
+import gym
+import numpy as np
 import tensorflow as tf
 
-class CustomCallback(tf.keras.callbacks.Callback):
-    def __init__(self, predict_model, target_model):
-        self.predict_model = predict_model
-        self.target_model = target_model
+from DeepQNetwork import PredictDeepQNet, TargetDeepQNet
+from MazeEnv import Maze
+from Utils import MemoryReplay
 
-    def on_epoch_begin(self, epoch, logs=None):
-        if (epoch+1) % 6 == 0:
-            self.target_model.set_weights(self.predict_model.get_weights())
-            # self.target_model.save("./RL_MODEL")
-            test_model(self.target_model)
 
 class Model(object):
     def __init__(self):
+        self.memory_replay = MemoryReplay(replay_size=100, e_greed=0.9, e_greed_decay=1)
+        self.explore_num = 16
+        self.train_samples_num = 32
+
+        self.state_dim = self.memory_replay.get_state_dim()
+        self.actions_num = self.memory_replay.get_actions_num()
         self.init_model()
 
     def init_model(self):
-        self.predict_model = PredictDeepQNet(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM)
-        self.target_model = TargetDeepQNet(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM)
+        self.predict_model = PredictDeepQNet(input_dim=self.state_dim, output_dim=self.actions_num)
+        self.target_model = TargetDeepQNet(input_dim=self.state_dim, output_dim=self.actions_num)
         self.predict_model.compile(optimizer="Adam", loss="MSE", metrics=["mse"])
 
-    def custom_loss(self, y_actual, y_pred):
-        max_num = tf.reduce_max(y_actual, axis=1, keepdims=True)
-        mask = tf.greater_equal(y_actual, max_num)
-        y_actual = tf.where(mask, y_actual, y_pred)
-        return tf.keras.losses.MSE(y_actual, y_pred)
+    def get_train_samples(self, samples_num):
+        return self.memory_replay.sample(samples_num)
 
     def train(self):
-        init_states_np, next_states_np, actions = self.experience_replay[:, :2], self.experience_replay[:, -2:], self.experience_replay[:, 2]
-        early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-5,
-                                    patience=0, verbose=0, mode='auto',
-                                    baseline=None, restore_best_weights=False)
-        custom_callback = CustomCallback(self.predict_model, self.target_model)
-        labels_data = self.get_labels(init_states_np, next_states_np, actions)
-        self.predict_model.fit(init_states_np, labels_data, batch_size=16, shuffle=True, verbose=0, epochs=1, validation_split=0, callbacks=[])
-        
-    def get_labels(self, init_states_np, next_states_np, actions):
+        train_samples = self.get_train_samples(self.train_samples_num)
+        init_states_np = train_samples[:, :self.state_dim]
+        actions_np = train_samples[:, self.state_dim]
+        rewards_np = train_samples[:, self.state_dim+1]
+        next_states_np = train_samples[:, self.state_dim+2:]
+
+        labels = self.get_labels(init_states_np, actions_np, rewards_np, next_states_np)
+        self.predict_model.fit(init_states_np, labels, batch_size=1, shuffle=True, verbose=0, epochs=1, validation_split=0, callbacks=[])
+
+    def test(self):
+        env = Maze()
+        obversation = env.reset()
+        for i in range(16):
+            env.render()
+            # print(obversation)
+            # print(self.target_model.predict(obversation.reshape(-1, self.state_dim)))
+            action = int(self.target_model.predict(obversation.reshape(-1, self.state_dim)).argmax())
+            print(["Left", "Down", "Right", "Up"] [action])
+            next_observation, reward, done, info = env.step(action)
+            if (next_observation == obversation).all():
+                break
+            obversation = next_observation 
+ 
+    def get_labels(self, init_states_np, actions_np, rewards_np, next_states_np):
         gama = 0.9
-        target_data = self.experience_replay[:, 3].reshape(-1, 1) + gama * self.target_model.predict(next_states_np, verbose=0)
-        target_data_max = np.max(target_data, axis=1)
         predict_data = self.predict_model.predict(init_states_np, verbose=0)
-        for i, action in enumerate(actions):
-            predict_data[i][int(action)] = target_data_max[i]
+        target_data = self.target_model.predict(next_states_np, verbose=0)
+        
+        target_data_max = np.max(target_data, axis=1)
+        for i, row in enumerate(predict_data):
+            row[int(actions_np[i])] = (target_data_max[i]*gama + rewards_np[i])
         return predict_data
 
     def run(self):
-        memory_replay = MemoryReplay(3000, e_greed=0.6, e_greed_decay=0.9)
-        self.experience_replay = memory_replay.sample(1000)
-
-        for i in range(100):
+        for i in range(2000):
             print("EPOCHES: {}".format(i))
-            self.train()
-            if (i+1) % 4 == 0:
+            if i==0:
                 self.target_model.set_weights(self.predict_model.get_weights())
-                test_model(self.target_model)
+            self.train()
+            if (i+1) % 3 == 0:
+                self.memory_replay.explore_env(self.explore_num, self.target_model)
+            if (i+1) % 20 == 0:
+                self.target_model.set_weights(self.predict_model.get_weights())
+                self.test()
 
-            memory_replay.explore_env(100, self.target_model)
-            self.experience_replay = memory_replay.sample(1000, self.experience_replay)
-            for i in self.experience_replay:
-                print(i)
-            print(self.experience_replay.shape)
 
 if __name__ == "__main__":
-    INPUT_DIM, OUTPUT_DIM = 2, 4
     model = Model()
     model.run()
