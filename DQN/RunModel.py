@@ -1,9 +1,13 @@
+import tkinter as tk
+from tkinter import *
+
 import gym
 import numpy as np
 import tensorflow as tf
 
 from DeepQNetwork import PredictDeepQNet, TargetDeepQNet
 from MazeEnv import Maze
+from Ploter import MazePloter
 from Utils import MemoryReplay
 
 
@@ -38,6 +42,7 @@ class Model(object):
     def test(self):
         env = Maze()
         obversation = env.reset()
+
         for i in range(16):
             env.render()
             # print(obversation)
@@ -47,7 +52,7 @@ class Model(object):
             next_observation, reward, done, info = env.step(action)
             if (next_observation == obversation).all():
                 break
-            obversation = next_observation 
+            obversation = next_observation
  
     def get_labels(self, init_states_np, actions_np, rewards_np, next_states_np):
         gama = 0.9

@@ -62,7 +62,6 @@ class MazePloter(object):
         self.init_position = cur_position
         time.sleep(0.1)
 
-
 if __name__ == "__main__":
     maze_map = np.zeros([5, 6])
 
@@ -84,4 +83,3 @@ if __name__ == "__main__":
         windows.run((i, i+1))
     
     root.mainloop()
-    

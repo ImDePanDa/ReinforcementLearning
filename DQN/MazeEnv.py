@@ -46,13 +46,13 @@ class Maze(object):
             print("ERROR: ACTION '{}' is not allowed!".format(action))
             exit(0)
 
-        reward = 0
-        if next_position == self.cur_position:
-            reward = -1
+        reward = -1/(self.maze_map.shape[0]*self.maze_map.shape[1])
+        # if next_position == self.cur_position:
+        #     reward = -1
         if self.maze_map[next_position] == -1:
-            reward = -2
+            reward = -1
         if self.maze_map[next_position] == 1:
-            reward = 2
+            reward = 1
         
         self.cur_position = next_position
         if self.plot: self.plot_maze()
