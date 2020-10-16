@@ -15,7 +15,7 @@ from Utils import MemoryReplay
 
 class Model(object):
     def __init__(self):
-        self.memory_replay = MemoryReplay(replay_size=128, e_greed=0.9, e_greed_decay=1)
+        self.memory_replay = MemoryReplay(replay_size=128, e_greed=0.95, e_greed_decay=0.99)
         self.explore_num = 16
         self.train_samples_num = 64
 
@@ -58,10 +58,10 @@ class Model(object):
         for i in range(16):
             windows.run(obversation)
             # env.render()
-            print("now position:", obversation)
-            print("model output:", self.target_model.predict(obversation.reshape(-1, self.state_dim)))
+            # print("now position:", obversation)
+            # print("model output:", self.target_model.predict(obversation.reshape(-1, self.state_dim)))
             action = int(self.target_model.predict(obversation.reshape(-1, self.state_dim)).argmax())
-            print(["Left", "Down", "Right", "Up"] [action])
+            # print(["Left", "Down", "Right", "Up"] [action])
             next_observation, reward, done, info = env.step(action)
             if (next_observation == obversation).all():
                 break
@@ -95,8 +95,7 @@ class Model(object):
                 t1.setDaemon(True)
                 t1.start()
                 
-
-
+                
 if __name__ == "__main__":
     model = Model()
     model.run()

@@ -60,7 +60,9 @@ class MemoryReplay(object):
 
             self.total_replay_count += 1
 
-        self.e_greed *= self.e_greed_decay
+        if (self.total_replay_count)%(4*self.replay_size)==0:
+            self.e_greed = max(0.1, self.e_greed*self.e_greed_decay)
+            print("Explore num: {}, e_greead: {}".format(self.total_replay_count, self.e_greed))
         
     def sample(self, num):
         num = min(self.memory_replay.shape[0], num) 
