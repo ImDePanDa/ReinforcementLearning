@@ -4,7 +4,7 @@ import tkinter as tk
 import time
 
 class MazePloter(object):
-    def __init__(self, input_maze_np, init_position):
+    def __init__(self, input_maze_np, init_position, root):
         self.maze_np = input_maze_np
         self.unit = 40
         self.col_margin = self.maze_np.shape[0]*self.unit*0.1
@@ -14,10 +14,11 @@ class MazePloter(object):
         self.maze_width = self.maze_np.shape[1]*self.unit
         self.cv_width =  self.maze_width + 2*self.row_margin
         self.init_position = init_position
+        self.root = root
         self.init()
 
     def init(self):
-        self.cv = Canvas(root, bg = 'white', height=self.cv_height, width=self.cv_width)
+        self.cv = Canvas(self.root, bg = 'white', height=self.cv_height, width=self.cv_width)
 
         left_top_point = (self.row_margin, self.col_margin)
         left_bottom_point = (self.row_margin, self.col_margin+self.maze_height)
@@ -77,9 +78,10 @@ if __name__ == "__main__":
     root = Tk()
     root.title("maze")
     
-    windows = MazePloter(maze_map, (0, 0))
+    windows = MazePloter(maze_map, (0, 0), root)
 
     for i in range(3):
         windows.run((i, i+1))
-    
+
+    root.after(100, root.destroy) 
     root.mainloop()

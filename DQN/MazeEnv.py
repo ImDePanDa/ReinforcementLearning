@@ -47,8 +47,6 @@ class Maze(object):
             exit(0)
 
         reward = -1/(self.maze_map.shape[0]*self.maze_map.shape[1])
-        # if next_position == self.cur_position:
-        #     reward = -1
         if self.maze_map[next_position] == -1:
             reward = -1
         if self.maze_map[next_position] == 1:
@@ -72,6 +70,7 @@ class Maze(object):
         df.iloc[self.cur_position] = 'X'
         print(df)
         print("-"*60)
+
 
 if __name__ == "__main__":
     env = Maze()
