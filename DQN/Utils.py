@@ -58,9 +58,14 @@ class MemoryReplay(object):
 
             self.total_replay_count += 1
 
-            if (self.total_replay_count)%(4*self.replay_size)==0:
+            if (self.total_replay_count)%(2*self.replay_size)==0:
                 self.e_greed = max(0.4, self.e_greed*self.e_greed_decay)
                 print("Explore num: {}, e_greead: {}".format(self.total_replay_count, self.e_greed))
+            
+            if done:
+                break
+        
+        return done
         
     def sample(self, num):
         num = min(self.memory_replay.shape[0], num) 
@@ -76,12 +81,9 @@ class MemoryReplay(object):
 
 if __name__ == "__main__":
     agent = MemoryReplay(20)
-    for v in agent.memory_replay:
-        print(v)
-    print()
-    agent.explore_env(20)
-    for v in agent.memory_replay:
-        print(v)
-    print()
-    for v in agent.sample(20):
-        print(v)
+    for i in range(100):
+        done = False
+        print("Episode: {}".format(i))
+        while not done:
+            done = agent.explore_env(4, None)
+            print(agent.memory_replay)

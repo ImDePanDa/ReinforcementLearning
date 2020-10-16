@@ -13,9 +13,11 @@ from Utils import MemoryReplay
 
 class Model(object):
     def __init__(self):
-        self.memory_replay = MemoryReplay(replay_size=256, e_greed=0.95, e_greed_decay=0.99)
-        self.explore_num = 16
-        self.train_samples_num = 32
+        self.memory_replay = MemoryReplay(replay_size=1024, e_greed=0.95, e_greed_decay=0.99)
+        self.explore_num = 32
+        self.train_samples_num = 64
+        self.train_iter_num = 0
+        self.place_weight_num = 256
 
         self.state_dim = self.memory_replay.get_state_dim()
         self.actions_num = self.memory_replay.get_actions_num()
@@ -30,19 +32,16 @@ class Model(object):
         return self.memory_replay.sample(samples_num)
 
     def train(self):
+        self.train_iter_num += 1
         train_samples = self.get_train_samples(self.train_samples_num)
         init_states_np = train_samples[:, :self.state_dim]
         actions_np = train_samples[:, self.state_dim]
         rewards_np = train_samples[:, self.state_dim+1]
         next_states_np = train_samples[:, self.state_dim+2:]
 
+        earlystop_callback = tf.keras.callbacks.EarlyStopping(monitor='loss', min_delta=1e-4, patience=1)
         labels = self.get_labels(init_states_np, actions_np, rewards_np, next_states_np)
-
-        # log_dir=os.path.join('logs', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))#在tensorboard可视化界面中会生成带时间标志的文件
-        # tensorboard_callback=tf.keras.callbacks.TensorBoard(log_dir, histogram_freq=1)
-        # tensorboard --logdir=E:\Algorithmn\ReinforcementLearning\DQN\logs
-        # http://localhost:6006/#scalars
-        self.predict_model.fit(init_states_np, labels, batch_size=self.train_samples_num//4, shuffle=True, verbose=0, epochs=1, validation_split=0, callbacks=[])
+        self.predict_model.fit(init_states_np, labels, batch_size=self.train_samples_num, shuffle=True, verbose=0, epochs=1, validation_split=0, callbacks=[earlystop_callback])
 
     def test(self):
         env = Maze()
@@ -58,7 +57,7 @@ class Model(object):
             if (next_observation == obversation).all() or done:
                 break
             obversation = next_observation
- 
+        
     def get_labels(self, init_states_np, actions_np, rewards_np, next_states_np):
         gama = 0.9
         predict_data = self.predict_model.predict(init_states_np, verbose=0)
@@ -71,13 +70,12 @@ class Model(object):
 
     def run(self):
         for i in range(3000):
-            print("EPOCHES: {}".format(i))
-            if i==0:
-                self.target_model.set_weights(self.predict_model.get_weights())
-            self.train()
-            if (i+1) % 2 == 0:
-                self.memory_replay.explore_env(self.explore_num, self.target_model)
-            if (i+1) % 16 == 0:
+            done = False
+            print("Episode: {}".format(i))
+            while not done:
+                self.train()
+                done = self.memory_replay.explore_env(self.explore_num, self.target_model)
+            if (self.train_iter_num) % (self.place_weight_num) == 0:
                 self.target_model.set_weights(self.predict_model.get_weights())
                 self.test()
                 
@@ -85,7 +83,11 @@ class Model(object):
                 # t1.setDaemon(True)
                 # t1.start()
                 
-                
 if __name__ == "__main__":
+    # log_dir=os.path.join('logs', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))#在tensorboard可视化界面中会生成带时间标志的文件
+    # tensorboard_callback=tf.keras.callbacks.TensorBoard(log_dir, histogram_freq=1)
+    # tensorboard --logdir=E:\Algorithmn\ReinforcementLearning\DQN\logs
+    # http://localhost:6006/#scalars
+
     model = Model()
     model.run()
