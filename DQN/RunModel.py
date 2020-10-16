@@ -13,9 +13,9 @@ from Utils import MemoryReplay
 
 class Model(object):
     def __init__(self):
-        self.memory_replay = MemoryReplay(replay_size=128, e_greed=0.95, e_greed_decay=0.99)
+        self.memory_replay = MemoryReplay(replay_size=256, e_greed=0.95, e_greed_decay=0.99)
         self.explore_num = 16
-        self.train_samples_num = 64
+        self.train_samples_num = 32
 
         self.state_dim = self.memory_replay.get_state_dim()
         self.actions_num = self.memory_replay.get_actions_num()
@@ -42,7 +42,7 @@ class Model(object):
         # tensorboard_callback=tf.keras.callbacks.TensorBoard(log_dir, histogram_freq=1)
         # tensorboard --logdir=E:\Algorithmn\ReinforcementLearning\DQN\logs
         # http://localhost:6006/#scalars
-        self.predict_model.fit(init_states_np, labels, batch_size=1, shuffle=True, verbose=0, epochs=1, validation_split=0, callbacks=[])
+        self.predict_model.fit(init_states_np, labels, batch_size=self.train_samples_num//4, shuffle=True, verbose=0, epochs=1, validation_split=0, callbacks=[])
 
     def test(self):
         env = Maze()
@@ -50,12 +50,12 @@ class Model(object):
 
         for i in range(16):
             env.render()
-            # print("now position:", obversation)
-            # print("model output:", self.target_model.predict(obversation.reshape(-1, self.state_dim)))
+            print("now position:", obversation)
+            print("model output:", self.target_model.predict(obversation.reshape(-1, self.state_dim)))
             action = int(self.target_model.predict(obversation.reshape(-1, self.state_dim)).argmax())
             print(["Left", "Down", "Right", "Up"] [action])
             next_observation, reward, done, info = env.step(action)
-            if (next_observation == obversation).all():
+            if (next_observation == obversation).all() or done:
                 break
             obversation = next_observation
  
@@ -79,10 +79,11 @@ class Model(object):
                 self.memory_replay.explore_env(self.explore_num, self.target_model)
             if (i+1) % 16 == 0:
                 self.target_model.set_weights(self.predict_model.get_weights())
+                self.test()
                 
-                t1 = Thread(target=self.test)
-                t1.setDaemon(True)
-                t1.start()
+                # t1 = Thread(target=self.test)
+                # t1.setDaemon(True)
+                # t1.start()
                 
                 
 if __name__ == "__main__":

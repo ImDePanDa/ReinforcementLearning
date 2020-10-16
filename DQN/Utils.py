@@ -32,15 +32,15 @@ class MemoryReplay(object):
             self.memory_replay[i][state_dim] = int(action)
             self.memory_replay[i][state_dim+1] = reward
             self.memory_replay[i][state_dim+2:] = next_observation
-            
-            observation = np.copy(next_observation)
+
+            observation = np.array(env.cur_position)
         
         self.env = env
         return state_dim, actions_num
 
     def explore_env(self, explore_num, model=None):
         for i in range(explore_num):
-            observation = self.memory_replay[-1][:self.state_dim] if i == 0 else observation
+            observation = np.array(self.env.cur_position)
             index = self.total_replay_count % self.replay_size
 
             if model and np.random.random() >= self.e_greed:
@@ -56,12 +56,10 @@ class MemoryReplay(object):
             self.memory_replay[index][self.state_dim+1] = reward
             self.memory_replay[index][self.state_dim+2:] = next_observation
 
-            observation = np.copy(next_observation)
-
             self.total_replay_count += 1
 
             if (self.total_replay_count)%(4*self.replay_size)==0:
-                self.e_greed = max(0.1, self.e_greed*self.e_greed_decay)
+                self.e_greed = max(0.4, self.e_greed*self.e_greed_decay)
                 print("Explore num: {}, e_greead: {}".format(self.total_replay_count, self.e_greed))
         
     def sample(self, num):
@@ -77,13 +75,13 @@ class MemoryReplay(object):
 
 
 if __name__ == "__main__":
-    agent = MemoryReplay(10)
+    agent = MemoryReplay(20)
     for v in agent.memory_replay:
         print(v)
     print()
-    agent.explore_env(10)
+    agent.explore_env(20)
     for v in agent.memory_replay:
         print(v)
     print()
-    for v in agent.sample(10):
+    for v in agent.sample(20):
         print(v)
