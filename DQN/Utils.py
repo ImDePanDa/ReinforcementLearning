@@ -33,14 +33,14 @@ class MemoryReplay(object):
             self.memory_replay[i][state_dim+1] = reward
             self.memory_replay[i][state_dim+2:] = next_observation
             
-            observation = np.copy(next_observation)
+            observation = np.array(env.cur_position)
         
         self.env = env
         return state_dim, actions_num
 
     def explore_env(self, explore_num, model=None):
         for i in range(explore_num):
-            observation = self.memory_replay[-1][:self.state_dim] if i == 0 else observation
+            observation = np.array(self.env.cur_position)
             index = self.total_replay_count % self.replay_size
 
             if model and np.random.random() >= self.e_greed:
@@ -55,8 +55,6 @@ class MemoryReplay(object):
             self.memory_replay[index][self.state_dim] = int(action)
             self.memory_replay[index][self.state_dim+1] = reward
             self.memory_replay[index][self.state_dim+2:] = next_observation
-
-            observation = np.copy(next_observation)
 
             self.total_replay_count += 1
 
