@@ -1,7 +1,6 @@
 import datetime
 import os
 from threading import Thread
-from tkinter import *
 
 import gym
 import numpy as np
@@ -9,7 +8,6 @@ import tensorflow as tf
 
 from DeepQNetwork import PredictDeepQNet, TargetDeepQNet
 from MazeEnv import Maze
-from Ploter import MazePloter
 from Utils import MemoryReplay
 
 
@@ -50,25 +48,16 @@ class Model(object):
         env = Maze()
         obversation = env.reset()
 
-        root = Tk()
-        root.title("maze")
-
-        windows = MazePloter(env.maze_map, env.cur_position, root)
-
         for i in range(16):
-            windows.run(obversation)
-            # env.render()
+            env.render()
             # print("now position:", obversation)
             # print("model output:", self.target_model.predict(obversation.reshape(-1, self.state_dim)))
             action = int(self.target_model.predict(obversation.reshape(-1, self.state_dim)).argmax())
-            # print(["Left", "Down", "Right", "Up"] [action])
+            print(["Left", "Down", "Right", "Up"] [action])
             next_observation, reward, done, info = env.step(action)
             if (next_observation == obversation).all():
                 break
             obversation = next_observation
-        
-        root.after(100, root.destroy) 
-        root.mainloop()
  
     def get_labels(self, init_states_np, actions_np, rewards_np, next_states_np):
         gama = 0.9
