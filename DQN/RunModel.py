@@ -14,10 +14,10 @@ from Utils import MemoryReplay
 class Model(object):
     def __init__(self):
         self.memory_replay = MemoryReplay(replay_size=1024, e_greed=0.95, e_greed_decay=0.99)
-        self.explore_num = 32
+        self.explore_num = 8
         self.train_samples_num = 64
         self.train_iter_num = 0
-        self.place_weight_num = 256
+        self.place_weight_num = 128
 
         self.state_dim = self.memory_replay.get_state_dim()
         self.actions_num = self.memory_replay.get_actions_num()
@@ -26,22 +26,30 @@ class Model(object):
     def init_model(self):
         self.predict_model = PredictDeepQNet(input_dim=self.state_dim, output_dim=self.actions_num)
         self.target_model = TargetDeepQNet(input_dim=self.state_dim, output_dim=self.actions_num)
-        self.predict_model.compile(optimizer="Adam", loss="MSE", metrics=["mse"])
+        optimizer =  tf.keras.optimizers.Adam(lr=0.001)
+        self.predict_model.compile(optimizer=optimizer, loss="MSE", metrics=["mse"])
 
     def get_train_samples(self, samples_num):
         return self.memory_replay.sample(samples_num)
 
     def train(self):
         self.train_iter_num += 1
+        if (self.train_iter_num) % (self.place_weight_num) == 0:
+            self.target_model.set_weights(self.predict_model.get_weights())
+            self.test()
+            # t1 = Thread(target=self.test)
+            # t1.setDaemon(True)
+            # t1.start()
+
         train_samples = self.get_train_samples(self.train_samples_num)
         init_states_np = train_samples[:, :self.state_dim]
         actions_np = train_samples[:, self.state_dim]
         rewards_np = train_samples[:, self.state_dim+1]
         next_states_np = train_samples[:, self.state_dim+2:]
 
-        earlystop_callback = tf.keras.callbacks.EarlyStopping(monitor='loss', min_delta=1e-4, patience=1)
+        earlystop_callback = tf.keras.callbacks.EarlyStopping(monitor='loss', min_delta=1e-3, patience=1)
         labels = self.get_labels(init_states_np, actions_np, rewards_np, next_states_np)
-        self.predict_model.fit(init_states_np, labels, batch_size=self.train_samples_num, shuffle=True, verbose=0, epochs=1, validation_split=0, callbacks=[earlystop_callback])
+        self.predict_model.fit(init_states_np, labels, batch_size=self.train_samples_num, shuffle=True, verbose=0, epochs=2, validation_split=0, callbacks=[earlystop_callback])
 
     def test(self):
         env = Maze()
@@ -75,13 +83,6 @@ class Model(object):
             while not done:
                 self.train()
                 done = self.memory_replay.explore_env(self.explore_num, self.target_model)
-            if (self.train_iter_num) % (self.place_weight_num) == 0:
-                self.target_model.set_weights(self.predict_model.get_weights())
-                self.test()
-                
-                # t1 = Thread(target=self.test)
-                # t1.setDaemon(True)
-                # t1.start()
                 
 if __name__ == "__main__":
     # log_dir=os.path.join('logs', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))#在tensorboard可视化界面中会生成带时间标志的文件

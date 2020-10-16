@@ -23,7 +23,7 @@ class Maze(object):
         for position in treasure_position:
             maze_map[position] = 1
 
-        bomb_position = [(1, 1), (3, 2)]
+        bomb_position = [(3, 2)]
         for position in bomb_position:
             maze_map[position] = -1
 
