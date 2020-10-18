@@ -49,7 +49,9 @@ class Model(object):
 
         earlystop_callback = tf.keras.callbacks.EarlyStopping(monitor='loss', min_delta=1e-3, patience=1)
         labels = self.get_labels(init_states_np, actions_np, rewards_np, next_states_np)
-        self.predict_model.fit(init_states_np, labels, batch_size=self.train_samples_num, shuffle=True, verbose=0, epochs=2, validation_split=0, callbacks=[earlystop_callback])
+        self.predict_model.fit(init_states_np, labels, batch_size=self.train_samples_num, \
+                                shuffle=True, verbose=0, epochs=2, validation_split=0, \
+                                    callbacks=[earlystop_callback])
 
     def test(self):
         env = Maze()

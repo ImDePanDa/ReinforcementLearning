@@ -5,7 +5,7 @@ from tensorflow.keras import layers
 class PredictDeepQNet(tf.keras.Model):
     def __init__(self, input_dim, output_dim):
         super(PredictDeepQNet, self).__init__()
-        self.dense1 = layers.Dense(2, activation=tf.nn.elu, input_dim=input_dim, kernel_initializer=tf.constant_initializer(0.1))
+        self.dense1 = layers.Dense(8, activation=tf.nn.elu, input_dim=input_dim, kernel_initializer=tf.constant_initializer(0.1))
         self.dense2 = layers.Dense(output_dim, activation=tf.nn.elu, kernel_initializer=tf.constant_initializer(0.1))
 
     def call(self, inputs):
@@ -16,7 +16,7 @@ class PredictDeepQNet(tf.keras.Model):
 class TargetDeepQNet(tf.keras.Model):
     def __init__(self, input_dim, output_dim):
         super(TargetDeepQNet, self).__init__()
-        self.dense1 = layers.Dense(2, activation=tf.nn.elu, input_dim=input_dim, kernel_initializer=tf.constant_initializer(0.1))
+        self.dense1 = layers.Dense(8, activation=tf.nn.elu, input_dim=input_dim, kernel_initializer=tf.constant_initializer(0.1))
         self.dense2 = layers.Dense(output_dim, activation=tf.nn.elu, kernel_initializer=tf.constant_initializer(0.1))
 
     def call(self, inputs):
