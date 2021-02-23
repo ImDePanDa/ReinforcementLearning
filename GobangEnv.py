@@ -211,7 +211,7 @@ def online_run(nepisode):
                             max_actions = r
                             max_index = index
                         break
-            action = env.op_cord[max_index]
+            action = env.op_cord.pop(max_index)
             # 数据采集
             # action = env.action_space.sample()
             checkerboard, reward, done, action = env.step(action)

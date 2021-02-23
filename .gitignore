@@ -3,3 +3,5 @@
 *.pyc
 *.egg-info
 /DQN/RL_MODEL/
+/memory
+*.json
