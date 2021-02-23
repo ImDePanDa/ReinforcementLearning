@@ -2,6 +2,7 @@
 import numpy as np
 import pandas as pd
 import json
+import os 
 
 class ActionSpace(object):
     """动作空间类
@@ -38,16 +39,17 @@ class Gobang(object):
         self.op_cord = [(x, y) for x in range(self.nrows) for y in range(self.ncols)]
         self.action_space = ActionSpace(self.op_cord)
 
-    def step(self):
+    def step(self, action):
         """进入回合"""
         self.epoch_num += 1
         reward, done, info = 0, False, None
         print("Epoch: {}".format(self.epoch_num))
         
         # 选手一回合
-        action = self.get_action(self.player1)
-        ret_action, ret_checkerboard = action, np.copy(self.checkerboard)
+        # action = self.get_action(self.player1)
+        ret_action = action
         flag = self.play_chess(action, 1)
+        ret_checkerboard = np.copy(self.checkerboard)
         print("选手一落子: {}.".format(action))
         self.plot_checkerboard()
         if flag == "win":
@@ -64,7 +66,7 @@ class Gobang(object):
         print("选手二落子: {}.".format(action))
         self.plot_checkerboard()
         if flag == "win":
-            reward = 1
+            reward = -1
             done = True
             return ret_checkerboard, reward, done, ret_action
         elif flag == "end":
@@ -166,21 +168,9 @@ class Gobang(object):
             return True 
         return False
 
-    def opponent_turn(self):
-        """对方回合"""
-        cord = input("你的回合, 请输入落子坐标(直接以空格分隔):\n").split(" ")
-        if cord[0] == "q": self.code_end_flag=True
-        action = tuple(map(int, cord))
-        while self.checkerboard[action] != 0:
-            action = (map(int, input("落子重复, 请输入落子坐标(直接以空格分隔):\n").split(" ")))
-        self.turn_end_flag = False
-        self.checkerboard[action] = 2
-        self.op_cord.remove(action)
-        print("选手二落子: {}.".format(action))
-        return action
-
     def plot_checkerboard(self):
         """棋盘绘制"""
+        # return
         df = pd.DataFrame(self.checkerboard)
 
         mask = df.isin([0])
@@ -193,60 +183,104 @@ class Gobang(object):
         print(df)
         print("-"*60)
 
-def offline_run():
-    """模型离线运行"""
-    env = Gobang(5, 5, player1="auto", player2="auto")
-    for episode in range(3):
-        for i in range(20): 
-            checkerboard, reward, done, action = env.step()
-            episode_checkerboard_memory = checkerboard if i==0 else np.append(episode_checkerboard_memory, checkerboard, axis=0)
-            episode_action_memory = list(action) if i==0 else episode_action_memory + list(action)
-            if done:
-                print("Game End!")
-                env.reset()
-                break
-        # 最后一位是reward
-        episode_action_memory += [reward]
-        np.save("./memory/episode_checkerboard_memory_{}.npy".format(episode), episode_checkerboard_memory)
-        np.save("./memory/episode_action_memory_{}.npy".format(episode), episode_action_memory)
-
-def online_run():
+def online_run(nepisode):
     """模型在线运行"""
-    env = Gobang(5, 5, player1="auto", player2="auto")
-    state_dict, state_num = {}, 0
-    for episode in range(3):
+    nrows, ncols = 5, 5
+    env = Gobang(nrows, ncols, player1="auto", player2="manual")
+    state_dict = read_from_json() if read_from_json() else {}
+    state_val =  read_from_json("state_val") if os.path.exists("./state_val.json") else [0.]*len(state_dict)
+    state_num = len(state_dict)
+    change_flag = False
+    gama = 0.9
+    for episode in range(nepisode):
+        print("Episode: {}".format(episode))
+        episode_state_memory = []
+        episode_action_memory = []
         for i in range(20): 
-            checkerboard, reward, done, action = env.step()
-            # 保存状态
-            if i==0:
-                state_dict[state_num] = checkerboard.tolist()
-                state_num += 1
-            else:
-                add_flag = True
+            # 人工博弈
+            max_actions, max_index = -float("inf"), 0
+            for index, action in enumerate(env.op_cord):
+                flag = env.play_chess(action, 1)
+                reward = 1 if flag == "win" else 0
+                checkerboard = np.copy(env.checkerboard)
+                env.checkerboard[action] = 0.
                 for k, v in state_dict.items():
                     if v==checkerboard.tolist():
-                        add_flag = False
-                if add_flag:
-                    state_dict[state_num] = checkerboard.tolist()
-                    state_num += 1
+                        r = gama*state_val[int(k)]+reward
+                        if r>max_actions:
+                            max_actions = r
+                            max_index = index
+                        break
+            action = env.op_cord[max_index]
+            # 数据采集
+            # action = env.action_space.sample()
+            checkerboard, reward, done, action = env.step(action)
+            checkerboard, action = checkerboard.tolist(), action[0]*nrows+action[1]
+            # 保存状态
+            add_flag = True
+            for k, v in state_dict.items():
+                if v==checkerboard:
+                    episode_state_memory.append(int(k))
+                    add_flag = False
+                    break
+            if add_flag:
+                change_flag = True
+                state_dict[state_num] = checkerboard
+                episode_state_memory.append(state_num)
+                state_num += 1
+            episode_action_memory.append(action)
             if done:
                 print("Game End!")
                 env.reset()
                 break
-    json_str = json.dumps(state_dict)
-    with open('./test.json', 'w') as f:
-        json.dump(json_str, f)
-    # with open('./test.json', 'r') as f:
-    #     json_str = json.load(f)
-    # data = json.loads(json_str)
-    # print(data["0"])
+        # 加上最后reward
+        episode_action_memory.append(reward)
+        file_num = len(os.listdir("./memory/"))//2
+        np.save("./memory/episode_checkerboard_memory_{}.npy".format(file_num), episode_state_memory)
+        np.save("./memory/episode_action_memory_{}.npy".format(file_num), episode_action_memory)
+    if change_flag: write_into_json(state_dict)
 
-def check_memory():
-    episode_checkerboard_memory = np.load("./memory/episode_checkerboard_memory_1.npy")
-    episode_action_memory = np.load("./memory/episode_action_memory_1.npy")
-    print(episode_checkerboard_memory)
-    print(episode_action_memory)
+def write_into_json(state_dict, name="state_dict"):
+    json_str = json.dumps(state_dict)
+    with open('./{}.json'.format(name), 'w') as f:
+        json.dump(json_str, f)
+
+def read_from_json(name="state_dict"):
+    if not os.path.exists('./{}.json'.format(name)):
+        return None
+    with open('./{}.json'.format(name), 'r') as f:
+        json_str = json.load(f)
+    state_dict = json.loads(json_str)
+    return state_dict
+
+def check_memory(num):
+    episode_checkerboard_memory = np.load("./memory/episode_checkerboard_memory_{}.npy".format(num))
+    episode_action_memory = np.load("./memory/episode_action_memory_{}.npy".format(num))
+    # print(episode_checkerboard_memory)
+    # print(episode_action_memory)
+    return episode_checkerboard_memory, episode_action_memory
+
+def train():
+    state_dict = read_from_json()
+    state_val =  read_from_json("state_val") if os.path.exists("./state_val.json") else [0.]*len(state_dict)
+    if len(state_dict)>len(state_val):
+        state_val += [0.]*(len(state_dict)-len(state_val))
+    gama = 0.9
+    diff, thre = 1, 1e-6
+    while diff>thre:
+        state_val_old = np.copy(np.array(state_val))
+        nepisodes = len(os.listdir("./memory/"))//2
+        for i in range(nepisodes):
+            episode_state_memory, episode_action_memory = check_memory(i)
+            for j in range(len(episode_state_memory)):
+                if j == len(episode_state_memory)-1:
+                    state_val[episode_state_memory[j]] = float(episode_action_memory[-1]) + 0
+                else:
+                    state_val[episode_state_memory[j]] =  gama*state_val[episode_state_memory[j+1]]
+        diff = np.power((state_val_old-np.array(state_val)), 2).mean()
+    print(state_val)
+    write_into_json(state_val, "state_val")
 
 if __name__ == "__main__":
-    online_run()
-    # check_memory()
+    online_run(1)
+    train()
