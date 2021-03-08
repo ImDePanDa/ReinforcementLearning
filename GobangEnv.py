@@ -282,5 +282,6 @@ def train():
     write_into_json(state_val, "state_val")
 
 if __name__ == "__main__":
+    # 该程序目前错误，S应该代表机器落子前的状态而非落子后的状态
     online_run(1)
     train()
